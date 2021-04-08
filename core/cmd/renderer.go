@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/store/presenters"
 	"github.com/smartcontractkit/chainlink/core/utils"
 	"github.com/smartcontractkit/chainlink/core/web"
-	webPresenters "github.com/smartcontractkit/chainlink/core/web/presenters"
+	webpresenters "github.com/smartcontractkit/chainlink/core/web/presenters"
 )
 
 // Renderer implements the Render method.
@@ -84,9 +84,9 @@ func (rt RendererTable) Render(v interface{}, headers ...string) error {
 		return rt.renderConfigPatchResponse(typed)
 	case *presenters.ConfigPrinter:
 		return rt.renderConfiguration(*typed)
-	case *presenters.ETHKey:
-		return rt.renderETHKeys([]presenters.ETHKey{*typed})
-	case *[]presenters.ETHKey:
+	case *webpresenters.ETHKeyResource:
+		return rt.renderETHKeys([]webpresenters.ETHKeyResource{*typed})
+	case *[]webpresenters.ETHKeyResource:
 		return rt.renderETHKeys(*typed)
 	case *p2pkey.EncryptedP2PKey:
 		return rt.renderP2PKeys([]p2pkey.EncryptedP2PKey{*typed})
@@ -102,14 +102,35 @@ func (rt RendererTable) Render(v interface{}, headers ...string) error {
 		return rt.renderJobsV2([]Job{*typed})
 	case *pipeline.Run:
 		return rt.renderPipelineRun(*typed)
-	case *webPresenters.LogResource:
+	case *webpresenters.LogResource:
 		return rt.renderLogResource(*typed)
+	case *[]VRFKeyPresenter:
+		return rt.renderVRFKeys(*typed)
 	default:
 		return fmt.Errorf("unable to render object of type %T: %v", typed, typed)
 	}
 }
 
-func (rt RendererTable) renderLogResource(logResource webPresenters.LogResource) error {
+func (rt RendererTable) renderVRFKeys(keys []VRFKeyPresenter) error {
+	var rows [][]string
+
+	for _, key := range keys {
+		rows = append(rows, []string{
+			key.Compressed,
+			key.Uncompressed,
+			key.Hash,
+			key.FriendlyCreatedAt(),
+			key.FriendlyUpdatedAt(),
+			key.FriendlyDeletedAt(),
+		})
+	}
+
+	renderList([]string{"Compressed", "Uncompressed", "Hash", "Created", "Updated", "Deleted"}, rows, rt.Writer)
+
+	return nil
+}
+
+func (rt RendererTable) renderLogResource(logResource webpresenters.LogResource) error {
 	table := rt.newTable([]string{"ID", "Level", "SqlEnabled"})
 	table.Append([]string{
 		logResource.ID,
@@ -190,7 +211,7 @@ func render(name string, table *tablewriter.Table) {
 	table.Render()
 }
 
-func renderList(fields []string, items [][]string) {
+func renderList(fields []string, items [][]string, writer io.Writer) {
 	var maxLabelLength int
 	for _, field := range fields {
 		if len(field) > maxLabelLength {
@@ -214,7 +235,11 @@ func renderList(fields []string, items [][]string) {
 	}
 	divider := strings.Repeat("-", maxLineLength)
 	listRendered := divider + "\n" + strings.Join(itemsRendered, "\n"+divider+"\n")
-	fmt.Println(listRendered)
+	_, err := writer.Write([]byte(listRendered))
+	if err != nil {
+		// Handles errcheck
+		return
+	}
 }
 
 func jobRowToStrings(job models.JobSpec) []string {
@@ -425,7 +450,7 @@ func (rt RendererTable) renderConfigPatchResponse(config *web.ConfigPatchRespons
 	return nil
 }
 
-func (rt RendererTable) renderETHKeys(keys []presenters.ETHKey) error {
+func (rt RendererTable) renderETHKeys(keys []webpresenters.ETHKeyResource) error {
 	var rows [][]string
 	for _, key := range keys {
 		nextNonce := fmt.Sprintf("%d", key.NextNonce)
@@ -450,7 +475,7 @@ func (rt RendererTable) renderETHKeys(keys []presenters.ETHKey) error {
 		})
 	}
 
-	renderList([]string{"Address", "ETH", "LINK", "Next nonce", "Last used", "Is funding", "Created", "Updated", "Deleted"}, rows)
+	renderList([]string{"Address", "ETH", "LINK", "Next nonce", "Last used", "Is funding", "Created", "Updated", "Deleted"}, rows, rt.Writer)
 	return nil
 }
 
@@ -471,7 +496,7 @@ func (rt RendererTable) renderP2PKeys(p2pKeys []p2pkey.EncryptedP2PKey) error {
 		})
 	}
 	fmt.Println("\n🔑 P2P Keys")
-	renderList([]string{"ID", "Peer ID", "Public key", "Created", "Updated", "Deleted"}, rows)
+	renderList([]string{"ID", "Peer ID", "Public key", "Created", "Updated", "Deleted"}, rows, rt.Writer)
 	return nil
 }
 
@@ -493,7 +518,7 @@ func (rt RendererTable) renderOCRKeys(ocrKeys []ocrkey.EncryptedKeyBundle) error
 		})
 	}
 	fmt.Println("\n🔑 OCR Keys")
-	renderList([]string{"ID", "On-chain signing addr", "Off-chain pubkey", "Config pubkey", "Created", "Updated", "Deleted"}, rows)
+	renderList([]string{"ID", "On-chain signing addr", "Off-chain pubkey", "Config pubkey", "Created", "Updated", "Deleted"}, rows, rt.Writer)
 	return nil
 }
 

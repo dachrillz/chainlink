@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
-
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -29,30 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink/core/utils"
 	"github.com/tidwall/gjson"
 )
-
-// ETHKey holds the hex representation of the address plus it's ETH & LINK balances
-type ETHKey struct {
-	Address     string         `json:"address"`
-	EthBalance  *assets.Eth    `json:"ethBalance"`
-	LinkBalance *assets.Link   `json:"linkBalance"`
-	NextNonce   int64          `json:"nextNonce"`
-	LastUsed    *time.Time     `json:"lastUsed"`
-	IsFunding   bool           `json:"isFunding"`
-	CreatedAt   time.Time      `json:"createdAt"`
-	UpdatedAt   time.Time      `json:"updatedAt"`
-	DeletedAt   gorm.DeletedAt `json:"deletedAt"`
-}
-
-// GetID returns the ID of this structure for jsonapi serialization.
-func (k ETHKey) GetID() string {
-	return k.Address
-}
-
-// SetID is used to set the ID of this structure when deserializing from jsonapi documents.
-func (k *ETHKey) SetID(value string) error {
-	k.Address = value
-	return nil
-}
 
 // ConfigPrinter are the non-secret values of the node
 //
@@ -406,7 +380,13 @@ func initiatorParams(i Initiator) (interface{}, error) {
 		}{i.Address, i.RequestData, i.Feeds, i.Threshold, i.AbsoluteThreshold,
 			i.Precision, i.PollTimer, i.IdleTimer}, nil
 	case models.InitiatorRandomnessLog:
-		return struct{ Address common.Address }{i.Address}, nil
+		return struct {
+			Address          common.Address `json:"address"`
+			JobIDTopicFilter models.JobID   `json:"jobIDTopicFilter"`
+		}{
+			i.Address,
+			i.JobIDTopicFilter,
+		}, nil
 	default:
 		return nil, fmt.Errorf("cannot marshal unsupported initiator type '%v'", i.Type)
 	}
